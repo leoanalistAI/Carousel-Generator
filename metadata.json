@@ -1,0 +1,5 @@
+{
+  "name": "Criador de Cards para Carrossel",
+  "description": "Gere imagens para carrosséis de redes sociais mantendo um estilo de ilustração consistente a partir de uma imagem de referência. Basta enviar sua imagem base, descrever a nova pose e criar seu card.",
+  "requestFramePermissions": []
+}
