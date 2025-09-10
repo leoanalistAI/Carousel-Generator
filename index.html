@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-br">
   <head>
-    <meta charset="UTF-," />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Criador de Cards para Carrossel com IA</title>
+    <title>Criador de Conteúdo com IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* For custom scrollbar styling if needed */
@@ -19,6 +19,50 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #4338ca; /* bg-indigo-700 */
+      }
+      
+      /* For animated gradient border on home cards */
+      @property --gradient-angle {
+        syntax: "<angle>";
+        initial-value: 0deg;
+        inherits: false;
+      }
+
+      @keyframes rotate {
+        to {
+          --gradient-angle: 360deg;
+        }
+      }
+
+      .animated-border {
+        position: relative;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        border-radius: 1.25rem; /* 20px */
+      }
+
+      .animated-border::before {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        z-index: -1;
+        border-radius: inherit;
+        background-image: conic-gradient(
+          from var(--gradient-angle),
+          #1f2937, /* bg-gray-800 */
+          #4f46e5, /* indigo-600 */
+          #a855f7, /* purple-500 */
+          #ec4899, /* pink-500 */
+          #4f46e5, /* indigo-600 */
+          #1f2937
+        );
+        animation: rotate 4s linear infinite;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+      }
+
+      .animated-border:hover::before {
+        opacity: 1;
       }
     </style>
   <script type="importmap">

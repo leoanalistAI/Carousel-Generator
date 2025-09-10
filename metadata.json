@@ -1,5 +1,5 @@
 {
-  "name": "Criador de Cards para Carrossel",
-  "description": "Gere imagens para carrosséis de redes sociais mantendo um estilo de ilustração consistente a partir de uma imagem de referência. Basta enviar sua imagem base, descrever a nova pose e criar seu card.",
+  "name": "Criador de Conteúdo com IA",
+  "description": "Gere imagens e vídeos para redes sociais mantendo um estilo consistente a partir de uma imagem de referência. Basta enviar sua imagem base, descrever as novas cenas e criar seu conteúdo.",
   "requestFramePermissions": []
 }

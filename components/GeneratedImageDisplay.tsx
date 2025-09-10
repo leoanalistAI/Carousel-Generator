@@ -1,183 +1,157 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
-import jsPDF from 'jspdf';
 import { DownloadIcon } from './icons/DownloadIcon';
-import { PdfIcon } from './icons/PdfIcon';
 import { ZipIcon } from './icons/ZipIcon';
+import { EditIcon } from './icons/EditIcon';
+import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
+import { ChevronRightIcon } from './icons/ChevronRightIcon';
 
 interface CarouselDisplayProps {
   imageUrls: (string | null)[];
   isLoading: boolean;
   error: string | null;
   prompts: string[];
+  onEditRequest: (index: number) => void;
 }
 
 const LoadingSpinner: React.FC = () => (
-  <div className="flex flex-col items-center justify-center gap-4">
+  <div className="w-full aspect-[4/5] flex flex-col items-center justify-center gap-4">
     <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-indigo-500"></div>
     <p className="text-gray-400">Gerando seu carrossel...</p>
     <p className="text-sm text-gray-500 text-center">Isso pode levar alguns instantes.</p>
   </div>
 );
 
-const GenerationError: React.FC = () => (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800/50 rounded-lg p-2 text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+const GenerationError: React.FC<{ message: string }> = ({ message }) => (
+    <div className="w-full aspect-[4/5] flex flex-col items-center justify-center bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
-        <p className="text-xs text-red-400 mt-2">Falha ao gerar</p>
+        <p className="font-semibold text-red-300">Ocorreu um erro</p>
+        <p className="text-sm text-red-400 mt-1">{message}</p>
     </div>
 );
 
+const Placeholder: React.FC = () => (
+  <div className="w-full aspect-[4/5] flex flex-col items-center justify-center bg-gray-800/50 rounded-lg text-center p-4">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+    <p className="mt-4 font-semibold text-gray-400">Seu carrossel aparecerá aqui</p>
+    <p className="text-sm text-gray-500">Preencha os campos e clique em "Gerar".</p>
+  </div>
+);
 
-export const CarouselDisplay: React.FC<CarouselDisplayProps> = ({ imageUrls, isLoading, error, prompts }) => {
-  const [isZipping, setIsZipping] = useState(false);
-  const [isPdfing, setIsPdfing] = useState(false);
+export const CarouselDisplay: React.FC<CarouselDisplayProps> = ({ imageUrls, isLoading, error, prompts, onEditRequest }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const activeImages = imageUrls.map((url, i) => ({ url, prompt: prompts[i], originalIndex: i })).filter(item => item.url);
 
-  const hasContent = imageUrls.length > 0;
-  const hasSuccessfulGenerations = hasContent && imageUrls.some(url => url !== null);
+  const prevSlide = () => {
+    const isFirstSlide = currentIndex === 0;
+    const newIndex = isFirstSlide ? activeImages.length - 1 : currentIndex - 1;
+    setCurrentIndex(newIndex);
+  };
 
-  const handleZipDownload = async () => {
-    if (!hasSuccessfulGenerations) return;
-    setIsZipping(true);
-    try {
-        const zip = new JSZip();
-        const validImages = imageUrls.map((url, index) => ({ url, index })).filter(item => item.url !== null);
+  const nextSlide = () => {
+    const isLastSlide = currentIndex === activeImages.length - 1;
+    const newIndex = isLastSlide ? 0 : currentIndex + 1;
+    setCurrentIndex(newIndex);
+  };
 
-        await Promise.all(validImages.map(async (item) => {
-            const response = await fetch(item.url!);
-            const blob = await response.blob();
-            zip.file(`card-${item.index + 1}.png`, blob);
-        }));
+  const goToSlide = (slideIndex: number) => {
+    setCurrentIndex(slideIndex);
+  };
 
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        
+  const handleDownloadAllAsZip = async () => {
+    const zip = new JSZip();
+    for (let i = 0; i < activeImages.length; i++) {
+        const item = activeImages[i];
+        const response = await fetch(item.url!);
+        const blob = await response.blob();
+        zip.file(`card_${i + 1}.png`, blob);
+    }
+    zip.generateAsync({ type: 'blob' }).then(content => {
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = 'carrossel-gerado.zip';
+        link.href = URL.createObjectURL(content);
+        link.download = 'carrossel.zip';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-    } catch (err) {
-        console.error("Failed to create ZIP file", err);
-    } finally {
-        setIsZipping(false);
-    }
+    });
   };
 
-  const handlePdfDownload = async () => {
-    if (!hasSuccessfulGenerations) return;
-    setIsPdfing(true);
-    try {
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'px',
-            format: [1080, 1920]
-        });
+  const renderContent = () => {
+    if (isLoading) return <LoadingSpinner />;
+    if (error) return <GenerationError message={error} />;
+    if (activeImages.length === 0) return <Placeholder />;
 
-        const validUrls = imageUrls.filter((url): url is string => url !== null);
+    const currentImage = activeImages[currentIndex];
+    
+    return (
+      <div className="relative w-full aspect-[4/5] group">
+          {/* Carousel Image */}
+          <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative">
+              <img src={currentImage.url!} alt={`Imagem gerada para: ${currentImage.prompt}`} className="w-full h-full object-cover" />
+              
+              {/* Overlay with actions */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
+                  <button onClick={() => onEditRequest(currentImage.originalIndex)} className="p-3 bg-gray-800/80 rounded-full text-white hover:bg-indigo-600 transition-colors" title="Editar Imagem">
+                      <EditIcon />
+                  </button>
+                   <a href={currentImage.url!} download={`card_${currentIndex + 1}.png`} className="p-3 bg-gray-800/80 rounded-full text-white hover:bg-indigo-600 transition-colors" title="Baixar Imagem">
+                      <DownloadIcon />
+                   </a>
+              </div>
+          </div>
 
-        validUrls.forEach((url, index) => {
-            if (index > 0) {
-                pdf.addPage([1080, 1920], 'portrait');
-            }
-            pdf.addImage(url, 'PNG', 0, 0, 1080, 1920, undefined, 'FAST');
-        });
+          {/* Prompt Display */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 rounded-b-lg">
+             <p className="text-sm text-white truncate" title={currentImage.prompt}>
+              <strong>Card {currentIndex + 1}:</strong> {currentImage.prompt}
+            </p>
+          </div>
 
-        pdf.save('carrossel-gerado.pdf');
-    } catch (err) {
-        console.error("Failed to create PDF file", err);
-    } finally {
-        setIsPdfing(false);
-    }
+          {/* Navigation */}
+          {activeImages.length > 1 && (
+            <>
+              <button onClick={prevSlide} className="absolute top-1/2 left-2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/80 transition-all opacity-0 group-hover:opacity-100">
+                <ChevronLeftIcon />
+              </button>
+              <button onClick={nextSlide} className="absolute top-1/2 right-2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/80 transition-all opacity-0 group-hover:opacity-100">
+                <ChevronRightIcon />
+              </button>
+            </>
+          )}
+
+           {/* Dot Indicators */}
+           <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex justify-center py-2 space-x-2">
+              {activeImages.map((_, slideIndex) => (
+                <button
+                  key={slideIndex}
+                  onClick={() => goToSlide(slideIndex)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    currentIndex === slideIndex ? 'bg-indigo-500' : 'bg-gray-600 hover:bg-gray-500'
+                  }`}
+                  aria-label={`Ir para o slide ${slideIndex + 1}`}
+                />
+              ))}
+            </div>
+      </div>
+    );
   };
-
-
+  
   return (
-    <div className="flex flex-col w-full h-full min-h-[30rem] bg-gray-900 rounded-lg p-4">
-      {isLoading && <div className="flex-grow flex items-center justify-center"><LoadingSpinner /></div>}
-      
-      {!isLoading && error && (
-        <div className="flex-grow flex items-center justify-center">
-            <div className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">
-              <p className="font-bold">Ocorreu um erro</p>
-              <p className="text-sm">{error}</p>
-            </div>
+    <div className="flex flex-col w-full items-center">
+      <div className="w-full">
+        {renderContent()}
+      </div>
+      {activeImages.length > 0 && !isLoading && !error && (
+        <div className="flex justify-center gap-3 mt-12">
+            <button onClick={handleDownloadAllAsZip} className="flex items-center gap-2 text-sm bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+              <ZipIcon />
+              Baixar .zip
+            </button>
         </div>
-      )}
-
-      {!isLoading && !error && !hasContent && (
-        <div className="flex-grow flex items-center justify-center text-center text-gray-500">
-          <p>Seus cards gerados aparecerão aqui.</p>
-        </div>
-      )}
-
-      {!isLoading && !error && hasContent && !hasSuccessfulGenerations && (
-         <div className="flex-grow flex items-center justify-center">
-            <div className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">
-              <p className="font-bold">Falha Total</p>
-              <p className="text-sm">Nenhuma imagem pôde ser gerada. Tente novamente ou ajuste suas descrições.</p>
-            </div>
-         </div>
-      )}
-
-      {!isLoading && !error && hasSuccessfulGenerations && (
-          <>
-            <div className="w-full flex justify-end items-center gap-3 mb-4">
-                <button
-                    onClick={handlePdfDownload}
-                    disabled={isPdfing || isZipping}
-                    className="flex items-center justify-center gap-2 bg-red-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-800 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed text-sm"
-                    aria-label="Baixar todas as imagens como PDF"
-                >
-                    <PdfIcon />
-                    {isPdfing ? 'Gerando...' : 'Baixar PDF'}
-                </button>
-                <button
-                    onClick={handleZipDownload}
-                    disabled={isZipping || isPdfing}
-                    className="flex items-center justify-center gap-2 bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed text-sm"
-                    aria-label="Baixar todas as imagens como arquivo ZIP"
-                >
-                    <ZipIcon />
-                    {isZipping ? 'Compactando...' : 'Baixar ZIP'}
-                </button>
-            </div>
-            <div className="w-full h-full overflow-y-auto">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {prompts.map((prompt, index) => {
-                        if (!prompt.trim()) return null;
-                        
-                        const url = imageUrls[index];
-
-                        return (
-                            <div key={index} className="aspect-[9/16] bg-gray-800 rounded-lg flex items-center justify-center shadow-md">
-                                {url ? (
-                                    <div className="group relative w-full h-full">
-                                        <img 
-                                            src={url} 
-                                            alt={`Imagem Gerada ${index + 1}`} 
-                                            className="w-full h-full object-cover rounded-lg" 
-                                        />
-                                        <a
-                                            href={url}
-                                            download={`card-gerado-${index + 1}.png`}
-                                            className="absolute bottom-2 right-2 bg-green-600 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all duration-300 transform hover:scale-110 focus:opacity-100"
-                                            aria-label={`Baixar Imagem ${index + 1}`}
-                                        >
-                                            <DownloadIcon />
-                                        </a>
-                                    </div>
-                                ) : (
-                                <GenerationError />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </>
       )}
     </div>
   );
